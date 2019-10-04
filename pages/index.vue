@@ -16,17 +16,17 @@
                 el-button(type="default", icon="el-icon-plus") New
                 el-dropdown-menu(slot="dropdown")
                   el-dropdown-item
-                    el-upload(:multiple="false", action="", :show-file-list="false" :on-success="btnFileUpload") File upload
-            li(:class="{active: menuActive == 'My Drive'}")
+                    el-upload(:multiple="false", action="", :show-file-list="false" :on-success="fileUploadStorageHandler") File upload
+            li(:class="{active: menuActive == 'My Drive'}", @click="menuActiveHandler('My Drive')")
               i.el-icon-files
               span My Drive
-            li(:class="{active: menuActive == 'Recent'}")
+            li(:class="{active: menuActive == 'Recent'}", @click="menuActiveHandler('Recent')")
               i.el-icon-time
               span Recent
-            li(:class="{active: menuActive == 'Starred'}")
+            li(:class="{active: menuActive == 'Starred'}", @click="menuActiveHandler('Starred')")
               i.el-icon-star-off
               span Starred
-            li(:class="{active: menuActive == 'Trash'}")
+            li(:class="{active: menuActive == 'Trash'}", @click="menuActiveHandler('Trash')")
               i.el-icon-delete
               span Trash
         el-main
@@ -36,17 +36,27 @@
               template(slot-scope="scope")
                 i(:class="displayIcon(scope.row.type)")
                 span &nbsp;&nbsp;{{ scope.row.display_name }}
-            el-table-column(prop="size", label="File size")
-            el-table-column(prop="type", label="File type")
-            el-table-column(prop="last_modify_time", label="Last modified", :sortable="true")
+            el-table-column(prop="size", label="File size", width="120")
+            el-table-column(prop="type", label="File type", width="140")
+            el-table-column(prop="last_modify_time", label="Last modified", :sortable="true", width="140")
           ul#context-menu
-            li(@click="btnDeleteFolder")
+            li
+              i.el-icon-star-off
+              span &nbsp;&nbsp;Add to Starred
+            li(@click="downloadFileHandler")
+              i.el-icon-download
+              span &nbsp;&nbsp;Download
+            li(@click="removeFileHandler")
               i.el-icon-delete
-              span &nbsp;Remove
+              span &nbsp;&nbsp;Remove
 </template>
 
 <script>
   import firebase from '@/plugins/firebase';
+
+  const userProfileRef = firebase.firestore().collection('user-profile');
+  const filesRef = firebase.firestore().collection('files');
+  const storageRef = firebase.storage().ref();
 
   export default {
     head() {
@@ -57,19 +67,18 @@
     },
     data() {
       return {
+        search: '',
         menuActive: 'My Drive',
         userProfile: {},
-        search: '',
-        ref: null,
         mainData: [
           {"id":"1","display_name":"1day.pdf","is_active":true,"last_modify_time":"2019/9/4","path":"Test/1day.pdf","size":"220.74 KB","type":"application/pdf"}, {"id":"2","display_name":"2day.pdf","is_active":true,"last_modify_time":"2019/9/2","path":"Test/2day.pdf","size":"220.74 KB","type":"application/pdf"}, {"id":"3","display_name":"3day.pdf","is_active":true,"last_modify_time":"2019/9/10","path":"Test/3day.pdf","size":"220.74 KB","type":"application/pdf"}
         ],
-        rowDataActive: {},
+        clickedData: {},
       }
     },
     created() {
-      // this.getUserProfile();
-      // this.getFolder();
+      this.getUserProfile();
+      this.getFolder();
     },
     computed: {
       avatarDisplayName() {
@@ -79,19 +88,81 @@
       }
     },
     methods: {
+      // handler
+      menuActiveHandler(name) {
+        this.menuActive = name;
+      },
+      async fileUploadStorageHandler(response, file) {
+        try{
+          console.log(file)
+          var mountainsRef = storageRef.child(`${this.userProfile.display_name}/${file.name}`);
+          await mountainsRef.put(file.raw, {contentType: file.type})
+          this.fileUploadDBHandler(file.raw)
+        }catch(err){
+          console.log(err);
+        }
+      },
+      fileUploadDBHandler(file) {
+        try{
+          const data = {
+            display_name: file.name,
+            type: file.type,
+            size: file.size,
+            size_display_name: this.formatByte(file.size),
+            is_active: true,
+            is_starred: false,
+            path: `${this.userProfile.display_name}/${file.name}`,
+            last_modify_time: this.getTodayDate()
+          };
+          const resp = filesRef.doc().set(data)
+          this.mainData.push(data)
+        }catch(err){
+          console.log(err);
+        }
+      },
+      removeFileHandler() {
+        try{
+          var desertRef = storageRef.child(this.clickedData.path);
+          desertRef.delete()
+        }catch(err){
+          console.log(err)
+        }
+        try{
+          filesRef.doc(this.clickedData.id).delete();
+        }catch(err){
+          console.log(err)
+        }
+      },
+      async downloadFileHandler() {
+        try{
+          const url = await storageRef.child(this.clickedData.path).getDownloadURL();
+          console.log(url)
+          // location.href = url
+          var xhr = new XMLHttpRequest();
+          xhr.responseType = 'blob';
+          xhr.onload = function(event) {
+            var blob = xhr.response;
+            console.log(blob)
+          };
+          xhr.open('GET', url);
+          xhr.send();
+          console.log(xhr)
+        }catch(err){
+          console.log(err)
+        }
+        // storageRef.child(this.clickedData.path).getDownloadURL().then(function(url) {
+
+        //   // // Or inserted into an <img> element:
+        //   // var img = document.getElementById('myimg');
+        //   // img.src = url;
+        // })
+      },
       // firebase
       async getUserProfile() {
         try{
-          const querySnapshot = await firebase.firestore().collection('user-profile').get()
-          // console.log(querySnapshot)
-          const mapData = querySnapshot.docs.map((doc) => {
-            // console.log(`${doc.id} => ${doc.data()}`);
-            return {
-              id: doc.id,
-              ...doc.data()
-            }
-          });
-          this.userProfile = mapData[0]
+          const querySnapshot = await userProfileRef.get()
+          const mapData = querySnapshot.docs.map(doc => { return { id: doc.id, ...doc.data() } });
+          this.userProfile = mapData[0];
           console.log('get user = %o', this.userProfile)
         }catch(err){
           console.log(err);
@@ -99,74 +170,17 @@
       },
       async getFolder() {
         try{
-          const querySnapshot = await firebase.firestore().collection('files').get()
-          // console.log(querySnapshot)
-          this.mainData = querySnapshot.docs.map((doc) => {
-            // console.log(`${doc.id} => ${doc.data()}`);
-            return {
-              id: doc.id,
-              ...doc.data()
-            }
-          });
-          // console.log('get folder = %o', this.mainData)
+          const querySnapshot = await filesRef.get()
+          this.mainData = querySnapshot.docs.map(doc => { return { id: doc.id, ...doc.data() } });
+          console.log('get folder = %o', this.mainData)
         }catch(err){
           console.log(err);
         }
-      },
-      btnFileUpload(response, file) {
-        console.log(file)
-        var storageRef = firebase.storage().ref();
-        var mountainsRef = storageRef.child(file.name);
-        var mountainImagesRef = storageRef.child(`${this.userProfile.display_name}/${file.name}`);
-        mountainImagesRef.put(file.raw, {contentType: file.type}).then( res => {
-          this.setFolder(file.raw)
-        })
-      },
-      setFolder(file) {
-        try{
-          const today = new Date();
-          const data = {
-            display_name: file.name,
-            type: file.type,
-            size: this.formatByte(file.size),
-            is_active: true,
-            path: `${this.userProfile.display_name}/${file.name}`,
-            last_modify_time: `${today.getFullYear()}/${today.getMonth()}/${today.getDate()}`
-          };
-          const resp = firebase.firestore().collection('files').doc().set(data)
-          this.mainData.push(data)
-        }catch(err){
-          console.log(err);
-        }
-      },
-      btnDeleteFolder() {
-        var storageRef = firebase.storage().ref();
-        var desertRef = storageRef.child(this.rowDataActive.path);
-          // Delete the file
-        desertRef.delete().then(function() {
-          console.log('delete success')
-          // File deleted successfully
-        }).catch(function(error) {
-          // Uh-oh, an error occurred!
-        });
-        firebase.firestore().collection('files').doc(this.rowDataActive.id).delete().then(() => {
-          console.log('delete data successful');
-        });
-      },
-      formatByte(bytes, decimals = 2) {
-        if (bytes === 0) return '0 Bytes';
-
-        const k = 1024;
-        const dm = decimals < 0 ? 0 : decimals;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
-
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
-      },
+      }, 
+      // context menu
       showContextMenu(row, column, event) {
         console.log(row, column, event)
-        this.rowDataActive = row;
+        this.clickedData = row;
         const clickCoords = this.getPosition(event);
         const menu = document.getElementById('context-menu');
         const menuWidth = menu.offsetWidth + 4;
@@ -192,6 +206,14 @@
         console.log('hide')
         document.getElementById("context-menu").classList.remove('active');
       },
+      // get function
+      displayIcon(type) {
+        const isPDF = /pdf/.test(type);
+        const isImage = /image/.test(type);
+        if(isImage) return 'el-icon-picture'
+        if(isPDF) return 'el-icon-s-order'
+        return 'el-icon-info'
+      },
       getPosition(e) {
         var posx = 0;
         var posy = 0;
@@ -211,13 +233,24 @@
           y: posy
         }
       },
-      displayIcon(type) {
-        const isPDF = /pdf/.test(type);
-        const isImage = /image/.test(type);
-        if(isImage) return 'el-icon-picture'
-        if(isPDF) return 'el-icon-s-order'
-        return 'el-icon-info'
-      }
+      getTodayDate() {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = (today.getMonth() > 9)? today.getMonth(): `0${today.getMonth()}`;
+        const day = (today.getDate() > 9)? today.getDate(): `0${today.getDate()}`;
+        return `${year}/${month}/${day}}`
+      },
+      formatByte(bytes, decimals = 2) {
+        if (bytes === 0) return '0 Bytes';
+
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+      },
     },
   }
 </script>
