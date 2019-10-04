@@ -36,7 +36,7 @@
               template(slot-scope="scope")
                 i(:class="displayIcon(scope.row.type)")
                 span &nbsp;&nbsp;{{ scope.row.display_name }}
-            el-table-column(prop="size", label="File size", width="120")
+            el-table-column(prop="size_display_name", label="File size", width="120")
             el-table-column(prop="type", label="File type", width="140")
             el-table-column(prop="last_modify_time", label="Last modified", :sortable="true", width="140")
           ul#context-menu
@@ -71,7 +71,7 @@
         menuActive: 'My Drive',
         userProfile: {},
         mainData: [
-          {"id":"1","display_name":"1day.pdf","is_active":true,"last_modify_time":"2019/9/4","path":"Test/1day.pdf","size":"220.74 KB","type":"application/pdf"}, {"id":"2","display_name":"2day.pdf","is_active":true,"last_modify_time":"2019/9/2","path":"Test/2day.pdf","size":"220.74 KB","type":"application/pdf"}, {"id":"3","display_name":"3day.pdf","is_active":true,"last_modify_time":"2019/9/10","path":"Test/3day.pdf","size":"220.74 KB","type":"application/pdf"}
+          // {"id":"1","display_name":"1day.pdf","is_active":true,"last_modify_time":"2019/9/4","path":"Test/1day.pdf","size":"220.74 KB","type":"application/pdf"}, {"id":"2","display_name":"2day.pdf","is_active":true,"last_modify_time":"2019/9/2","path":"Test/2day.pdf","size":"220.74 KB","type":"application/pdf"}, {"id":"3","display_name":"3day.pdf","is_active":true,"last_modify_time":"2019/9/10","path":"Test/3day.pdf","size":"220.74 KB","type":"application/pdf"}
         ],
         clickedData: {},
       }
@@ -137,25 +137,19 @@
         try{
           const url = await storageRef.child(this.clickedData.path).getDownloadURL();
           console.log(url)
-          // location.href = url
           var xhr = new XMLHttpRequest();
           xhr.responseType = 'blob';
           xhr.onload = function(event) {
             var blob = xhr.response;
-            console.log(blob)
           };
           xhr.open('GET', url);
           xhr.send();
-          console.log(xhr)
+          // setTimeout(()=>{
+          //   window.open(xhr.responseURL, '_blank')
+          // }, 1000)
         }catch(err){
           console.log(err)
         }
-        // storageRef.child(this.clickedData.path).getDownloadURL().then(function(url) {
-
-        //   // // Or inserted into an <img> element:
-        //   // var img = document.getElementById('myimg');
-        //   // img.src = url;
-        // })
       },
       // firebase
       async getUserProfile() {
@@ -238,7 +232,7 @@
         const year = today.getFullYear();
         const month = (today.getMonth() > 9)? today.getMonth(): `0${today.getMonth()}`;
         const day = (today.getDate() > 9)? today.getDate(): `0${today.getDate()}`;
-        return `${year}/${month}/${day}}`
+        return `${year}/${month}/${day}`
       },
       formatByte(bytes, decimals = 2) {
         if (bytes === 0) return '0 Bytes';
