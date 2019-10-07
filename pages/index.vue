@@ -37,8 +37,8 @@
               span.small-text {{ storageDisplayName }}
         el-main
           .main-title {{ menuActive }}
-          el-table(:data="filterMainData", style="width: 100%", oncontextmenu="return false;", unselectable="on", @row-contextmenu="showContextMenu")
-            el-table-column(prop="display_name", label="Name", :sortable="(menuActive == 'My Drive') ")
+          el-table(:data="filterMainData", style="width: 100%", oncontextmenu="return false;", unselectable="on", @row-contextmenu="showContextMenu", @row-click="previewFileHandler")
+            el-table-column(prop="display_name", label="Name", :sortable="(menuActive == 'My Drive')")
               template(slot-scope="scope")
                 i(:class="displayIcon(scope.row.type)")
                 span &nbsp;&nbsp;{{ scope.row.display_name }}&nbsp;
@@ -222,12 +222,13 @@
         }
       },
       // preview
-      async previewFileHandler() {
-        if(!!this.clickedData.file_url){
-          window.open(this.clickedData.file_url, '_blank')
+      async previewFileHandler(row) {
+        const item = (!!row)? row: this.clickedData;
+        if(!!item.file_url){
+          window.open(item.file_url, '_blank')
         }else{
           try{
-            const url = await storageRef.child(this.clickedData.path).getDownloadURL();
+            const url = await storageRef.child(item.path).getDownloadURL();
             window.open(url, '_blank')
           }catch(err){
             console.log(err)

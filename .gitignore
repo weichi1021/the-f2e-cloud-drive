@@ -91,3 +91,4 @@ sw.*
 package.json
 package-lock.json
 cors.json
+.firebase/
